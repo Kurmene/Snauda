@@ -1,0 +1,48 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Ja augšupielādē ZIP, to atpako un izmanto
+      - name: Unzip uploaded project if present
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for f in *.zip; do
+            mkdir -p _extracted
+            unzip -o "$f" -d _extracted
+            inner_count=$(find _extracted -mindepth 1 -maxdepth 1 | wc -l)
+            inner_dir=$(find _extracted -mindepth 1 -maxdepth 1 -type d)
+            if [ "$inner_count" = "1" ] && [ -n "$inner_dir" ]; then
+              cp -rf "$inner_dir"/. .
+            else
+              cp -rf _extracted/. .
+            fi
+            rm -rf _extracted
+            rm -f "$f"
+          done
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build debug APK
+        run: gradle :app:assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Snauda-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
